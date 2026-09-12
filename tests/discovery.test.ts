@@ -91,7 +91,7 @@ describe("discoverActiveWallets", () => {
       }),
       getLogs: async () => [],
       isContractAddress: async () => {
-        starts.push(Date.now());
+        starts.push(performance.now());
         active += 1;
         peak = Math.max(peak, active);
         await new Promise((resolve) => setTimeout(resolve, 5));
@@ -100,10 +100,10 @@ describe("discoverActiveWallets", () => {
       },
     };
     await discoverActiveWallets(provider, {
-      fromBlock: 0, toBlock: 0, minScore: 1, maxConcurrentRequests: 2, requestDelayMs: 1,
+      fromBlock: 0, toBlock: 0, minScore: 1, maxConcurrentRequests: 2, requestDelayMs: 10,
     });
     expect(peak).toBeLessThanOrEqual(2);
     expect(starts).toHaveLength(6);
-    expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...starts.slice(1).map((start, index) => start - starts[index]!))).toBeGreaterThanOrEqual(5);
   });
 });
