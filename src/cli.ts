@@ -50,7 +50,8 @@ export async function runDiscovery(args: string[], env: NodeJS.ProcessEnv = proc
   const fromBlock = options.fromBlock ?? saved?.cursor.nextBlock ?? Math.max(0, latest - (options.window ?? 100) + 1);
   if (fromBlock > latest) throw new Error("fromBlock cannot be greater than toBlock/latest block");
   const discoveryOptions = {
-    window: latest - fromBlock + 1,
+    fromBlock,
+    toBlock: latest,
     ...(options.limit === undefined ? {} : { limit: options.limit }),
     ...(options.minScore === undefined ? {} : { minScore: options.minScore }),
   };

@@ -6,6 +6,8 @@ export interface DiscoveryProvider extends RpcDataProvider {
 
 export interface DiscoveryOptions {
   window?: number;
+  fromBlock?: number;
+  toBlock?: number;
   limit?: number;
   minScore?: number;
   excludedAddresses?: string[];
@@ -76,8 +78,14 @@ export async function discoverActiveWallets(
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("Discovery limit must be positive");
   if (!Number.isFinite(minScore) || minScore < 0) throw new Error("Discovery minScore must be non-negative");
 
-  const latest = await provider.getBlockNumber();
-  const fromBlock = Math.max(0, latest - window + 1);
+  const latest = options.toBlock ?? await provider.getBlockNumber();
+  if (!Number.isSafeInteger(latest) || latest < 0) throw new Error("Discovery toBlock must be a non-negative safe integer");
+  if (options.fromBlock !== undefined &&
+      (!Number.isSafeInteger(options.fromBlock) || options.fromBlock < 0)) {
+    throw new Error("Discovery fromBlock must be a non-negative safe integer");
+  }
+  const fromBlock = options.fromBlock ?? Math.max(0, latest - window + 1);
+  if (fromBlock > latest) throw new Error("Discovery fromBlock cannot be greater than toBlock/latest block");
   const [blocks, logs] = await Promise.all([
     Promise.all(Array.from({ length: latest - fromBlock + 1 }, (_, i) => provider.getBlock(fromBlock + i))),
     provider.getLogs(fromBlock, latest),

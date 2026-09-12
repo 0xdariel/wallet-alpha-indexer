@@ -51,4 +51,30 @@ describe("discoverActiveWallets", () => {
       window: 1, minScore: 3, excludedAddresses: [candidate],
     })).toEqual([]);
   });
+
+  it("scans an explicit block range without consulting the provider tip", async () => {
+    const candidate = address(30);
+    const requestedBlocks: number[] = [];
+    const provider: DiscoveryProvider = {
+      getBlockNumber: async () => {
+        throw new Error("provider tip should not be requested");
+      },
+      getBlock: async (number) => {
+        requestedBlocks.push(number);
+        return {
+          number: `0x${number.toString(16)}`, timestamp: "0x1",
+          transactions: [{ hash: "a", from: candidate, to: null, value: "0x0" }],
+        };
+      },
+      getLogs: async (from, to) => {
+        expect([from, to]).toEqual([10, 11]);
+        return [];
+      },
+      isContractAddress: async () => false,
+    };
+    await expect(discoverActiveWallets(provider, {
+      fromBlock: 10, toBlock: 11, minScore: 1,
+    })).resolves.toHaveLength(1);
+    expect(requestedBlocks).toEqual([10, 11]);
+  });
 });
