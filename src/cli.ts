@@ -13,6 +13,11 @@ interface CliOptions {
   minScore?: number;
   statePath: string;
   timeoutMs: number;
+  maxRetries: number;
+  retryBaseDelayMs: number;
+  retryMaxDelayMs: number;
+  maxConcurrentRequests: number;
+  requestDelayMs: number;
 }
 
 function parseNumber(value: string, name: string): number {
@@ -22,7 +27,7 @@ function parseNumber(value: string, name: string): number {
 }
 
 export function parseDiscoveryArgs(args: string[]): CliOptions {
-  const options: CliOptions = { statePath: ".robinhood-discovery.json", timeoutMs: 10_000 };
+  const options: CliOptions = { statePath: ".robinhood-discovery.json", timeoutMs: 10_000, maxRetries: 3, retryBaseDelayMs: 250, retryMaxDelayMs: 5_000, maxConcurrentRequests: 4, requestDelayMs: 100 };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     const value = args[++index];
@@ -35,6 +40,11 @@ export function parseDiscoveryArgs(args: string[]): CliOptions {
     else if (argument === "--min-score") options.minScore = Number(value);
     else if (argument === "--state") options.statePath = value;
     else if (argument === "--timeout-ms") options.timeoutMs = parseNumber(value, argument);
+    else if (argument === "--max-retries") options.maxRetries = parseNumber(value, argument);
+    else if (argument === "--retry-base-delay-ms") options.retryBaseDelayMs = parseNumber(value, argument);
+    else if (argument === "--retry-max-delay-ms") options.retryMaxDelayMs = parseNumber(value, argument);
+    else if (argument === "--max-concurrent-requests") options.maxConcurrentRequests = parseNumber(value, argument);
+    else if (argument === "--request-delay-ms") options.requestDelayMs = parseNumber(value, argument);
     else throw new Error(`Unknown option ${argument}`);
   }
   return options;
@@ -44,7 +54,10 @@ export async function runDiscovery(args: string[], env: NodeJS.ProcessEnv = proc
   const options = parseDiscoveryArgs(args);
   const config = loadRobinhoodChainConfig({ ...env, ...(options.rpcUrl ? { ROBINHOOD_CHAIN_RPC_URL: options.rpcUrl } : {}) });
   if (!config.rpcUrl) throw new Error("Set ROBINHOOD_CHAIN_RPC_URL or pass --rpc-url");
-  const provider = createJsonRpcProvider(createHttpJsonRpcTransport(config.rpcUrl, { timeoutMs: options.timeoutMs }));
+  const provider = createJsonRpcProvider(createHttpJsonRpcTransport(config.rpcUrl, {
+    timeoutMs: options.timeoutMs, maxRetries: options.maxRetries,
+    retryBaseDelayMs: options.retryBaseDelayMs, retryMaxDelayMs: options.retryMaxDelayMs,
+  }));
   const latest = options.toBlock ?? await provider.getBlockNumber();
   const saved = options.fromBlock === undefined ? await loadDiscoverySnapshot(options.statePath) : null;
   const fromBlock = options.fromBlock ?? saved?.cursor.nextBlock ?? Math.max(0, latest - (options.window ?? 100) + 1);
@@ -54,6 +67,8 @@ export async function runDiscovery(args: string[], env: NodeJS.ProcessEnv = proc
     toBlock: latest,
     ...(options.limit === undefined ? {} : { limit: options.limit }),
     ...(options.minScore === undefined ? {} : { minScore: options.minScore }),
+    maxConcurrentRequests: options.maxConcurrentRequests,
+    requestDelayMs: options.requestDelayMs,
   };
   const candidates = await discoverActiveWallets(provider, discoveryOptions);
   await saveDiscoverySnapshot(options.statePath, {

@@ -20,4 +20,31 @@ describe("createHttpJsonRpcTransport", () => {
     await expect(createHttpJsonRpcTransport("https://rpc.example.test", { fetchImpl: timeoutFetch, timeoutMs: 1 })
       .request("eth_blockNumber", [])).rejects.toThrow("timed out");
   });
+
+  it("retries 429 and 5xx responses with bounded exponential delays", async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("", { status: 429 }))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result: "ok" }), { status: 200 }));
+    const delays: number[] = [];
+    const transport = createHttpJsonRpcTransport("https://rpc.example.test", {
+      fetchImpl, retryBaseDelayMs: 10, retryMaxDelayMs: 15,
+      sleepImpl: async (milliseconds) => { delays.push(milliseconds); },
+    });
+    await expect(transport.request("eth_blockNumber", [])).resolves.toBe("ok");
+    expect(delays).toEqual([10, 15]);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("honors Retry-After and reports exhaustion clearly", async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "2" } }));
+    const delays: number[] = [];
+    await expect(createHttpJsonRpcTransport("https://rpc.example.test", {
+      fetchImpl, maxRetries: 2, retryMaxDelayMs: 5_000,
+      sleepImpl: async (milliseconds) => { delays.push(milliseconds); },
+    }).request("eth_getLogs", [])).rejects.toThrow("eth_getLogs with status 429");
+    expect(delays).toEqual([2_000, 2_000]);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
 });

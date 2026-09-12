@@ -77,4 +77,33 @@ describe("discoverActiveWallets", () => {
     })).resolves.toHaveLength(1);
     expect(requestedBlocks).toEqual([10, 11]);
   });
+
+  it("bounds concurrent requests and paces candidate code checks", async () => {
+    const candidates = Array.from({ length: 6 }, (_, index) => address(40 + index));
+    let active = 0;
+    let peak = 0;
+    const starts: number[] = [];
+    const provider: DiscoveryProvider = {
+      getBlockNumber: async () => 0,
+      getBlock: async () => ({
+        number: "0x0", timestamp: "0x1",
+        transactions: candidates.map((candidate, index) => ({ hash: `${index}`, from: candidate, to: null, value: "0x0" })),
+      }),
+      getLogs: async () => [],
+      isContractAddress: async () => {
+        starts.push(performance.now());
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return false;
+      },
+    };
+    await discoverActiveWallets(provider, {
+      fromBlock: 0, toBlock: 0, minScore: 1, maxConcurrentRequests: 2, requestDelayMs: 10,
+    });
+    expect(peak).toBeLessThanOrEqual(2);
+    expect(starts).toHaveLength(6);
+    expect(Math.max(...starts.slice(1).map((start, index) => start - starts[index]!))).toBeGreaterThanOrEqual(5);
+  });
 });
