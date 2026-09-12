@@ -55,4 +55,10 @@ The smoke test accepts at most 20 blocks and a 10-second timeout, prints only ch
 
 This is an explicitly incomplete baseline. It does not yet value open positions, resolve historical prices, or attribute transfers, staking, airdrops, bridges, wrapped assets, tax lots, or cross-wallet activity. On-chain data can be incomplete or reorged, token metadata can be misleading, and a public address does not prove ownership or identify a person or platform. In particular, no result should be presented as evidence that a wallet belongs to Robinhood or any other service.
 
+## DEX swap decoding and historical pricing
+
+The swap layer is provider-neutral and deliberately conservative. The only built-in adapter is `UniswapV2SwapAdapter`, which accepts only the canonical `Swap(address,uint256,uint256,uint256,uint256,address)` event (`0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822`) for a configured pool and token pair. ERC-20 `Transfer` logs, unknown signatures, and swaps where the wallet is not an indexed sender or recipient are ignored; no other protocol is claimed to be supported.
+
+`HistoricalPriceProvider` supplies timestamped USD prices for both swap assets. `priceDecodedSwaps` emits token `TradeEvent`s only when both prices and validated token decimals are available, and returns an explicit warning otherwise. Prices, pool metadata, router attribution, and protocol coverage are application-supplied; no endpoint, API key, ownership, or Robinhood-account claim is included.
+
 Robinhood ingestion supports public wallet analysis only. It does not establish ownership or attribute an address to a Robinhood account. Incomplete RPC/indexer data, reorgs, missing token metadata, and unsupported activity can materially affect PnL.
