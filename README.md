@@ -26,6 +26,15 @@ Robinhood Chain mainnet is available as the `robinhood` chain (chain ID `4663`).
 
 `discoverActiveWallets` scans a bounded recent block window (default 100 blocks), collects transaction and ERC-20 transfer participants, checks each candidate with `eth_getCode`, deduplicates addresses, and returns a ranked list. Configure `window`, `limit`, `minScore`, and explicit excluded addresses. The conservative score is `transactionCount + 2 * transferCount + activeBlocks`; it is an activity signal only, not a profitability or ownership inference. The scanner requires no credentials beyond whatever public RPC transport the application supplies.
 
+For an end-to-end local scan, set `ROBINHOOD_CHAIN_RPC_URL` and run:
+
+```bash
+npm run discover:robinhood -- --window 100 --limit 10 --min-score 2 --state .robinhood-discovery.json
+npm run discover:robinhood -- --from-block 1000 --to-block 1100 --limit 10
+```
+
+The CLI uses a dependency-free HTTP JSON-RPC transport with a 10-second timeout, prints only structured candidate results, and persists the last scanned cursor and results as an atomic JSON snapshot. Override the endpoint with `--rpc-url`; use a local state path with `--state`. RPC URLs are not printed or persisted. Discovery is bounded to 10,000 blocks per scan and should be treated as incomplete when providers prune history or return partial logs.
+
 ## PnL baseline
 
 `calculateFifoPnl` calculates realized USD PnL using first-in-first-out lots. Buy fees increase cost basis; sell fees reduce proceeds. Events must already contain normalized quantities and USD prices, which is the responsibility of the upstream adapter. Sells without matching lots are reported as partial and produce warnings rather than inventing acquisition history.

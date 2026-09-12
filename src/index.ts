@@ -2,5 +2,8 @@ export * from "./config.js";
 export * from "./ingestion/evm.js";
 export * from "./ingestion/rpc.js";
 export * from "./ingestion/discovery.js";
+export * from "./ingestion/http-rpc.js";
+export * from "./ingestion/persistence.js";
+export * from "./cli.js";
 export * from "./pnl.js";
 export * from "./types.js";
