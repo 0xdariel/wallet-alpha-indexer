@@ -1,0 +1,18 @@
+{
+  "name": "wallet-alpha-indexer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public on-chain wallet performance tracker MVP",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
