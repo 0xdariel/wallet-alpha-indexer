@@ -6,6 +6,12 @@ export interface WalletConfig {
   providerUrls: Record<string, string>;
 }
 
+export interface ChainConfig {
+  name: string;
+  chainId: number;
+  rpcUrl?: string;
+}
+
 export interface EvmTransaction {
   hash: string;
   chain: string;

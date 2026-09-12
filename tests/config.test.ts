@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadWalletConfig } from "../src/config.js";
+import { loadRobinhoodChainConfig, loadWalletConfig } from "../src/config.js";
 
 describe("loadWalletConfig", () => {
   it("parses a public wallet and configurable chain provider URLs", () => {
@@ -16,5 +16,16 @@ describe("loadWalletConfig", () => {
 
   it("rejects malformed addresses", () => {
     expect(() => loadWalletConfig({ WALLET_ADDRESS: "not-an-address" })).toThrow("WALLET_ADDRESS");
+  });
+
+  it("loads Robinhood Chain mainnet configuration without requiring an endpoint", () => {
+    expect(loadRobinhoodChainConfig({
+      ROBINHOOD_CHAIN_RPC_URL: "https://rpc.example.test",
+    })).toEqual({
+      name: "robinhood",
+      chainId: 4663,
+      rpcUrl: "https://rpc.example.test",
+    });
+    expect(loadRobinhoodChainConfig({})).toEqual({ name: "robinhood", chainId: 4663 });
   });
 });
