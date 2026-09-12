@@ -117,12 +117,13 @@ export async function ingestRpcRange(
         to: transaction.to?.toLowerCase() ?? null,
         timestamp,
         valueWei: BigInt(transaction.value).toString(),
+        blockNumber,
       });
     }
   }
   const tokenTransfers = logs
     .filter((log) => log.topics[0]?.toLowerCase() === ERC20_TRANSFER_TOPIC && log.topics.length >= 3)
-    .map((log) => {
+    .map((log): TokenTransfer | null => {
       const fromTopic = log.topics[1];
       const toTopic = log.topics[2];
       if (!fromTopic || !toTopic) return null;
@@ -139,6 +140,7 @@ export async function ingestRpcRange(
         to,
         amountBaseUnits: BigInt(log.data).toString(),
         timestamp: timestamps.get(blockNumber) ?? 0,
+        blockNumber,
       };
     })
     .filter((transfer): transfer is TokenTransfer => transfer !== null);

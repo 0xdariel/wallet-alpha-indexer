@@ -6,4 +6,7 @@ export * from "./ingestion/http-rpc.js";
 export * from "./ingestion/persistence.js";
 export * from "./cli.js";
 export * from "./pnl.js";
+export * from "./profile.js";
+export * from "./metadata.js";
+export * from "./smoke.js";
 export * from "./types.js";

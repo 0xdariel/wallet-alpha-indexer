@@ -8,7 +8,8 @@
     "build": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "discover:robinhood": "tsx src/cli.ts"
+    "discover:robinhood": "tsx src/cli.ts",
+    "smoke:robinhood": "tsx src/smoke.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
