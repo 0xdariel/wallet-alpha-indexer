@@ -9,4 +9,5 @@ export * from "./pnl.js";
 export * from "./profile.js";
 export * from "./metadata.js";
 export * from "./smoke.js";
+export * from "./swaps.js";
 export * from "./types.js";
