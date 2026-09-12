@@ -75,6 +75,17 @@ describe("end-to-end wallet PnL report", () => {
     expect(report.warnings).toContain("Missing historical USD price for swap 0xmissing; swap excluded from PnL");
   });
 
+  it("turns provider failures into deterministic report warnings", async () => {
+    const report = await buildWalletPnlReport({
+      ...request([swapLog("0xfailed")], 2),
+      prices: { getUsdPrice: async () => { throw new Error("price quote is stale for the requested timestamp"); } },
+    });
+    expect(report.tradeCount).toBe(0);
+    expect(report.warnings).toContain(
+      "Historical USD price lookup failed for swap 0xfailed: price quote is stale for the requested timestamp; swap excluded from PnL",
+    );
+  });
+
   it("does not treat an empty range as a trade", async () => {
     const report = await buildWalletPnlReport(request([], 1));
     expect(report.tradeCount).toBe(0);
