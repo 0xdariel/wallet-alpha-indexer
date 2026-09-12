@@ -12,3 +12,5 @@ export * from "./smoke.js";
 export * from "./swaps.js";
 export * from "./report.js";
 export * from "./types.js";
+export * from "./onchain-pricing.js";
+export * from "./batch.js";

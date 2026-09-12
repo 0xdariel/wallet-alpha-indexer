@@ -29,6 +29,7 @@ export interface RpcDataProvider {
   getBlockNumber(): Promise<number>;
   getBlock(blockNumber: number): Promise<RpcBlock | null>;
   getLogs(fromBlock: number, toBlock: number, address?: string, topic0?: string): Promise<RpcLog[]>;
+  call?(to: string, data: string, blockNumber?: number): Promise<string>;
 }
 
 export interface RpcDiscoveryProvider extends RpcDataProvider {
@@ -60,6 +61,8 @@ export function createJsonRpcProvider(transport: JsonRpcTransport): RpcDiscovery
         topics: [topic0],
         ...(address ? { address } : {}),
       }]),
+    call: (to, data, blockNumber) =>
+      transport.request<string>("eth_call", [{ to, data }, blockNumber === undefined ? "latest" : `0x${blockNumber.toString(16)}`]),
     isContractAddress: async (address) =>
       (await transport.request<string>("eth_getCode", [address, "latest"])) !== "0x",
   };
