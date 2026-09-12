@@ -87,3 +87,34 @@ The command reads the latest RPC block and requests one historical quote at that
 4. Converts priced swaps into FIFO events and returns deterministic JSON through `serializeWalletPnlReport`.
 
 The report includes realized PnL, FIFO holdings, trade count, and a win rate only when at least one swap has both prices. It reports confidence and sorted warnings for missing prices, metadata, unmatched history, unsupported activity, and partial RPC data. Generic ERC-20 transfers are never treated as trades. Unrealized PnL is intentionally not calculated: holdings are open FIFO positions and are not valued at a current or historical mark. The result is an analysis of public on-chain activity only and does not prove wallet ownership or Robinhood account attribution.
+
+## Auditable on-chain prices and batch reports
+
+`OnChainLiquidityPriceProvider` is the built-in provider-neutral on-chain resolver. Configure
+each supported liquidity pair explicitly with its pool, token, quote token, and quote USD
+value, and provide validated token decimals. It reads `token0()` and `getReserves()` with
+the swap's block tag, then derives a spot price from those reserves. It returns no price when
+the pair, block number, decimals, or reserves are unavailable; it never selects an unknown
+DEX contract, fabricates a quote, or uses a later block. Only configured Uniswap-V2-style
+contracts are supported.
+
+`buildBatchReports(candidates, createRequest, { topN, concurrency })` selects and filters a
+deterministic top-N candidate set, runs bounded concurrent reports, excludes unsupported or
+invalid reports from `included`, and ranks results by realized PnL, discovery score, and
+address. Each result retains explicit status and warnings. Example:
+
+```ts
+const prices = new OnChainLiquidityPriceProvider(rpc, [
+  { poolAddress, tokenAddress, quoteTokenAddress: usdc, quoteUsd: 1 },
+], new Map([[tokenAddress, 18], [usdc, 6]]));
+const batch = await buildBatchReports(candidates, (candidate) => ({
+  walletAddress: candidate.address, chain: "robinhood", fromBlock, toBlock,
+  provider: rpc, adapters, metadata, prices,
+}), { topN: 10, concurrency: 2 });
+console.log(JSON.stringify(batch));
+```
+
+Ranges remain capped at 10,000 blocks per wallet report. Batch processing is an analysis
+of public data only: unsupported DEXes, missing metadata, missing reserves, pruned RPC
+history, and reorgs produce warnings or invalid results rather than estimates. RPC and
+price endpoint credentials are never included in reports.
