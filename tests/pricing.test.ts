@@ -27,13 +27,26 @@ describe("HttpHistoricalPriceProvider", () => {
 
   it("rejects stale, invalid, and HTTP-error responses without exposing the endpoint", async () => {
     const stale = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ price: 1, timestamp: 1_100 }), { status: 200 }));
-    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/key", maxAgeSeconds: 10, fetchImpl: stale }).getUsdPrice(request))
+    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/{chain}/{assetAddress}/{timestamp}", maxAgeSeconds: 10, fetchImpl: stale }).getUsdPrice(request))
       .rejects.toThrow("stale");
     const invalid = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ priceUsd: "nope" }), { status: 200 }));
-    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/key", fetchImpl: invalid }).getUsdPrice(request))
+    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/{chain}/{assetAddress}/{timestamp}", fetchImpl: invalid }).getUsdPrice(request))
       .rejects.toThrow("invalid USD price");
     const failure = vi.fn<typeof fetch>().mockResolvedValue(new Response("", { status: 503 }));
-    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/key", fetchImpl: failure }).getUsdPrice(request))
+    await expect(new HttpHistoricalPriceProvider({ endpointTemplate: "https://secret.example/{chain}/{assetAddress}/{timestamp}", fetchImpl: failure }).getUsdPrice(request))
       .rejects.toThrow("HTTP 503");
+  });
+
+  it("requires the request identity fields in the endpoint template", () => {
+    expect(() => new HttpHistoricalPriceProvider({ endpointTemplate: "https://prices.example/history" }))
+      .toThrow("must contain {chain}");
+  });
+
+  it("rejects malformed JSON payloads explicitly", async () => {
+    const malformed = vi.fn<typeof fetch>().mockResolvedValue(new Response("null", { status: 200 }));
+    await expect(new HttpHistoricalPriceProvider({
+      endpointTemplate: "https://prices.example/{chain}/{assetAddress}/{timestamp}",
+      fetchImpl: malformed,
+    }).getUsdPrice(request)).rejects.toThrow("invalid JSON payload");
   });
 });

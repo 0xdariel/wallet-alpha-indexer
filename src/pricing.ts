@@ -30,6 +30,14 @@ function priceValue(payload: PricePayload): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+function validateEndpointTemplate(template: string): void {
+  for (const field of ["chain", "assetAddress", "timestamp"]) {
+    if (!template.includes(`{${field}}`)) {
+      throw new Error(`Price endpoint template must contain {${field}}`);
+    }
+  }
+}
+
 function expandTemplate(template: string, request: HistoricalPriceRequest): URL {
   const values: Record<string, string> = {
     chain: request.chain,
@@ -54,6 +62,7 @@ export class HttpHistoricalPriceProvider implements HistoricalPriceProvider {
 
   constructor(options: HttpHistoricalPriceProviderOptions) {
     if (!options.endpointTemplate.trim()) throw new Error("Price endpoint template is required");
+    validateEndpointTemplate(options.endpointTemplate);
     this.endpointTemplate = options.endpointTemplate;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.maxAgeSeconds = options.maxAgeSeconds ?? 86_400;
@@ -73,7 +82,10 @@ export class HttpHistoricalPriceProvider implements HistoricalPriceProvider {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error(`price endpoint returned HTTP ${response.status}`);
-      const payload = await response.json() as PricePayload;
+      const payload = await response.json() as PricePayload | null;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        throw new Error("price endpoint returned an invalid JSON payload");
+      }
       const price = priceValue(payload);
       if (price === undefined) throw new Error("price endpoint returned an invalid USD price");
       const quoteTimestamp = finiteInteger(payload.timestamp ?? payload.data?.timestamp);
