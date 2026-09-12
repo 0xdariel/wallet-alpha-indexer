@@ -5,10 +5,14 @@ This repository contains a small, provider-neutral MVP for tracking the performa
 ## Setup
 
 ```bash
-npm install
+npm ci
 npm test
 npm run build
 ```
+
+Tests run in Node without CSS processing. The explicit Vitest configuration keeps
+Vite from discovering a host-level PostCSS configuration; this repository has no
+CSS assets or PostCSS dependency.
 
 Configure a wallet and optional provider endpoints with environment variables:
 
