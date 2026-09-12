@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateFifoPnl } from "../src/pnl.js";
+import { calculateFifoPnl, calculateWalletPnlBaseline } from "../src/pnl.js";
 
 describe("calculateFifoPnl", () => {
   it("matches sells against the oldest lots and includes fees in basis", () => {
@@ -32,5 +32,20 @@ describe("calculateFifoPnl", () => {
 
     expect(result.openPositions).toHaveLength(0);
     expect(result.warnings).toEqual(["Ignored invalid trade bad"]);
+  });
+
+  it("warns without treating generic transfers as swaps", () => {
+    const result = calculateWalletPnlBaseline([], [{
+      transactionHash: "transfer",
+      chain: "robinhood",
+      tokenAddress: "0x0000000000000000000000000000000000000002",
+      decimals: 18,
+      from: "0x0000000000000000000000000000000000000001",
+      to: "0x0000000000000000000000000000000000000003",
+      amountBaseUnits: "1",
+      timestamp: 1,
+    }]);
+    expect(result.realizedPnlUsd).toBe(0);
+    expect(result.warnings).toContain("Generic token transfers were observed but were not treated as swaps; profitability requires trusted trade events and prices");
   });
 });

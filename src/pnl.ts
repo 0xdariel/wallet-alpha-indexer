@@ -1,4 +1,4 @@
-import type { PnlResult, TradeEvent } from "./types.js";
+import type { PnlResult, TokenTransfer, TradeEvent } from "./types.js";
 
 interface Lot {
   quantity: number;
@@ -28,6 +28,7 @@ export function calculateFifoPnl(events: TradeEvent[]): PnlResult {
       warnings.push(`Ignored invalid trade ${event.transactionHash}`);
       continue;
     }
+
     const feeUsd = event.feeUsd ?? 0;
     if (!Number.isFinite(feeUsd) || feeUsd < 0) {
       warnings.push(`Ignored trade with invalid fee ${event.transactionHash}`);
@@ -79,4 +80,18 @@ export function calculateFifoPnl(events: TradeEvent[]): PnlResult {
       .filter((position) => position.quantity > 0),
     warnings,
   };
+}
+
+export function calculateWalletPnlBaseline(events: TradeEvent[], transfers: TokenTransfer[] = []): PnlResult {
+  const result = calculateFifoPnl(events);
+  const warnings = [...result.warnings];
+  if (transfers.length > 0) {
+    warnings.push(
+      "Generic token transfers were observed but were not treated as swaps; profitability requires trusted trade events and prices",
+    );
+  }
+  if (events.length === 0) {
+    warnings.push("No trusted trade events were supplied; realized PnL is incomplete");
+  }
+  return { ...result, warnings };
 }

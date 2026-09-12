@@ -35,9 +35,23 @@ npm run discover:robinhood -- --from-block 1000 --to-block 1100 --limit 10
 
 The CLI uses a dependency-free HTTP JSON-RPC transport with a 10-second timeout, prints only structured candidate results, and persists the last scanned cursor and results as an atomic JSON snapshot. Override the endpoint with `--rpc-url`; use a local state path with `--state`. RPC URLs are not printed or persisted. Discovery is bounded to 10,000 blocks per scan and should be treated as incomplete when providers prune history or return partial logs.
 
+For a non-persisting live validation, provide the RPC URL explicitly and use a small bounded window:
+
+```bash
+npm run smoke:robinhood -- --rpc-url https://your-rpc.example --window 10 --timeout-ms 5000
+```
+
+The smoke test accepts at most 20 blocks and a 10-second timeout, prints only chain/range/result data, and never logs or persists the RPC URL. It validates tip access, block/log discovery, contract filtering, and candidate output. A provider URL is intentionally never hardcoded.
+
+## Wallet profiles and metadata
+
+`buildWalletProfile` aggregates public activity into first/last seen timestamps, transaction and transfer counts, active days, optional native balance, and token holdings. Holdings are calculated from observed ERC-20 transfers only; metadata is resolved through the provider-neutral `TokenMetadataCache`, cached by token address, and marked `unknown` when decimals cannot be validated. Unknown-decimal balances remain in base units and lower profile confidence. No profile implies ownership or Robinhood-account attribution.
+
 ## PnL baseline
 
 `calculateFifoPnl` calculates realized USD PnL using first-in-first-out lots. Buy fees increase cost basis; sell fees reduce proceeds. Events must already contain normalized quantities and USD prices, which is the responsibility of the upstream adapter. Sells without matching lots are reported as partial and produce warnings rather than inventing acquisition history.
+
+`calculateWalletPnlBaseline` adds an explicit warning when generic transfers are present: transfers are not inferred to be swaps, and no profitability claim is made without trusted trade events and prices. This baseline reports realized PnL only and remains incomplete for open-position valuation, missing history, and unsupported activity.
 
 This is an explicitly incomplete baseline. It does not yet value open positions, resolve historical prices, or attribute transfers, staking, airdrops, bridges, wrapped assets, tax lots, or cross-wallet activity. On-chain data can be incomplete or reorged, token metadata can be misleading, and a public address does not prove ownership or identify a person or platform. In particular, no result should be presented as evidence that a wallet belongs to Robinhood or any other service.
 
