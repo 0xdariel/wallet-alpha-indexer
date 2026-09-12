@@ -108,6 +108,16 @@ function confidence(warnings: readonly string[], tradeCount: number): WalletPnlR
   return "low";
 }
 
+function isWalletTransfer(
+  log: Awaited<ReturnType<RpcDataProvider["getLogs"]>>[number],
+  walletAddress: string,
+): boolean {
+  if (log.topics[0]?.toLowerCase() !== ERC20_TRANSFER_TOPIC || log.topics.length < 3) return false;
+  const from = log.topics[1]?.slice(-40).toLowerCase();
+  const to = log.topics[2]?.slice(-40).toLowerCase();
+  return from === walletAddress.slice(2) || to === walletAddress.slice(2);
+}
+
 export async function buildWalletPnlReport(request: WalletPnlReportRequest): Promise<WalletPnlReport> {
   validateRange(request.fromBlock, request.toBlock);
   const walletAddress = request.walletAddress.toLowerCase();
@@ -117,8 +127,14 @@ export async function buildWalletPnlReport(request: WalletPnlReportRequest): Pro
     ),
   );
   const timestamps = new Map<number, number>();
-  for (const block of blocks) {
-    if (block) timestamps.set(blockNumber(block.number), Number(BigInt(block.timestamp)));
+  let missingBlockCount = 0;
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (!block) {
+      missingBlockCount += 1;
+      continue;
+    }
+    timestamps.set(blockNumber(block.number), blockNumber(block.timestamp));
   }
   const [swapLogs, transferLogs] = await Promise.all([
     request.adapters.length === 0
@@ -135,11 +151,16 @@ export async function buildWalletPnlReport(request: WalletPnlReportRequest): Pro
   const pnl = calculateFifoPnl(priced.events);
   const warnings = [...metadataResult.warnings, ...priced.warnings, ...pnl.warnings];
   const swapTransactions = new Set(decoded.map((swap) => swap.transactionHash));
-  if (transferLogs.some((log) => !swapTransactions.has(log.transactionHash))) {
+  if (transferLogs.some((log) => isWalletTransfer(log, walletAddress) && !swapTransactions.has(log.transactionHash))) {
     warnings.push("Generic token transfers were observed but were not treated as swaps");
   }
+  if (missingBlockCount > 0) {
+    warnings.push(`Partial RPC data: ${missingBlockCount} block(s) were unavailable; affected logs may be excluded`);
+  }
+  if (logs.length < swapLogs.length) {
+    warnings.push("Partial RPC data: swap logs from unavailable blocks were excluded");
+  }
   if (decoded.length === 0) warnings.push("No supported swap events were found in the bounded range");
-  warnings.push("Unrealized PnL is not calculated; holdings are open FIFO positions only");
   const tradeCount = priced.events.length / 2;
   const winCount = metadataResult.swaps
     .filter((swap) => priced.events.some((event) => event.transactionHash === swap.transactionHash))

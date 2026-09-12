@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TokenMetadataCache } from "../src/metadata.js";
 import { buildWalletPnlReport, serializeWalletPnlReport } from "../src/report.js";
 import { UNISWAP_V2_SWAP_TOPIC, UniswapV2SwapAdapter, type EvmEventLog } from "../src/swaps.js";
-import type { RpcDataProvider } from "../src/ingestion/rpc.js";
+import { ERC20_TRANSFER_TOPIC, type RpcDataProvider } from "../src/ingestion/rpc.js";
 
 const wallet = "0x0000000000000000000000000000000000000001";
 const pool = "0x0000000000000000000000000000000000000002";
@@ -79,5 +79,26 @@ describe("end-to-end wallet PnL report", () => {
     const report = await buildWalletPnlReport(request([], 1));
     expect(report.tradeCount).toBe(0);
     expect(report.warnings).toContain("No supported swap events were found in the bounded range");
+  });
+
+  it("only warns about wallet transfers and reports unavailable blocks", async () => {
+    const logs = [swapLog("0x1")];
+    const provider = fixtureProvider(logs);
+    provider.getBlock = async (number) =>
+      number === 9 ? null : { number: `0x${number.toString(16)}`, timestamp: "0x64", transactions: [] };
+    provider.getLogs = async (_from, _to, _address, topic0) =>
+      topic0 === UNISWAP_V2_SWAP_TOPIC
+        ? logs.map((log) => ({ ...log, blockNumber: "0xa" }))
+        : [{
+            address: token0,
+          topics: [ERC20_TRANSFER_TOPIC, topic(pool), topic(pool)],
+            data: "0x",
+            transactionHash: "0xunrelated",
+            blockNumber: "0xa",
+          }];
+
+    const report = await buildWalletPnlReport({ ...request(logs, 2), fromBlock: 9, toBlock: 10, provider });
+    expect(report.warnings).not.toContain("Generic token transfers were observed but were not treated as swaps");
+    expect(report.warnings).toContain("Partial RPC data: 1 block(s) were unavailable; affected logs may be excluded");
   });
 });
