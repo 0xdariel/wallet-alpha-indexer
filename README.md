@@ -37,7 +37,9 @@ npm run discover:robinhood -- --window 100 --limit 10 --min-score 2 --state .rob
 npm run discover:robinhood -- --from-block 1000 --to-block 1100 --limit 10
 ```
 
-The CLI uses a dependency-free HTTP JSON-RPC transport with a 10-second timeout, prints only structured candidate results, and persists the last scanned cursor and results as an atomic JSON snapshot. Override the endpoint with `--rpc-url`; use a local state path with `--state`. RPC URLs are not printed or persisted. Discovery is bounded to 10,000 blocks per scan and should be treated as incomplete when providers prune history or return partial logs.
+The CLI uses a dependency-free HTTP JSON-RPC transport with a 10-second timeout and bounded retries (three retries by default) for HTTP 429 and 5xx responses. `Retry-After` is honored when present, otherwise exponential delays are capped at five seconds; exhausted requests fail with the method and HTTP status. Discovery defaults to four concurrent requests and a 100ms start-time spacing across block, log, and `eth_getCode` calls. Tune `--max-retries`, `--retry-base-delay-ms`, `--retry-max-delay-ms`, `--max-concurrent-requests`, and `--request-delay-ms` for a provider's published limits, but keep scans conservative on small VPS deployments. Override the endpoint with `--rpc-url`; use a local state path with `--state`. RPC URLs are not printed or persisted. Discovery is bounded to 10,000 blocks per scan and should be treated as incomplete when providers prune history or return partial logs.
+
+For VPS operation, prefer a provider endpoint with documented burst and daily quotas, use a modest request concurrency (2-4), and leave pacing enabled rather than compensating for 429s with more parallelism. A dedicated RPC or paid indexed endpoint is more reliable for repeated Robinhood scans than a public shared endpoint; never commit provider keys in environment files or command history.
 
 For a non-persisting live validation, provide the RPC URL explicitly and use a small bounded window:
 
