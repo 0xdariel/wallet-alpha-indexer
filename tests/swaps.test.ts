@@ -63,6 +63,29 @@ describe("provider-neutral DEX swap decoding", () => {
     expect(result.warnings).toEqual(["Missing historical USD price for swap 0xswap; swap excluded from PnL"]);
   });
 
+  it("rejects malformed swaps with multiple input or output legs", () => {
+    expect(
+      decodeDexSwapLogs(
+        [swapLog(`0x${word(1000n)}${word(1n)}${word(0n)}${word(2500n)}`)],
+        [adapter],
+        wallet,
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects non-finite or negative historical prices", async () => {
+    const [swap] = decodeDexSwapLogs(
+      [swapLog(`0x${word(1000n)}${word(0n)}${word(0n)}${word(2500n)}`)],
+      [adapter],
+      wallet,
+    );
+    const result = await priceDecodedSwaps([swap!], {
+      getUsdPrice: async ({ assetAddress }) => assetAddress === token0 ? Number.NaN : -1,
+    });
+    expect(result.events).toEqual([]);
+    expect(result.warnings).toEqual(["Invalid historical USD price for swap 0xswap; swap excluded from PnL"]);
+  });
+
   it("creates deterministic token trade events when both prices exist", async () => {
     const [swap] = decodeDexSwapLogs(
       [swapLog(`0x${word(1000n)}${word(0n)}${word(0n)}${word(2500n)}`)],

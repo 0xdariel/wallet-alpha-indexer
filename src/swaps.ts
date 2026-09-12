@@ -74,6 +74,10 @@ function token(token: SwapToken): SwapToken {
   return { ...token, address: normalizeAddress(token.address) };
 }
 
+function validDecimals(decimals: number): boolean {
+  return Number.isInteger(decimals) && decimals >= 0 && decimals <= 255;
+}
+
 export class UniswapV2SwapAdapter implements DexSwapAdapter {
   readonly protocol = "uniswap-v2" as const;
   readonly eventSignature = SUPPORTED_SWAP_EVENT_SIGNATURES["uniswap-v2"];
@@ -101,11 +105,14 @@ export class UniswapV2SwapAdapter implements DexSwapAdapter {
     if (!words) return null;
     const [amount0In, amount1In, amount0Out, amount1Out] = words;
     if (amount0In === undefined || amount1In === undefined || amount0Out === undefined || amount1Out === undefined) return null;
-    const inputToken = amount0In > 0n ? this.token0 : amount1In > 0n ? this.token1 : null;
-    const inputAmount = amount0In > 0n ? amount0In : amount1In > 0n ? amount1In : null;
-    const outputToken = amount0Out > 0n ? this.token0 : amount1Out > 0n ? this.token1 : null;
-    const outputAmount = amount0Out > 0n ? amount0Out : amount1Out > 0n ? amount1Out : null;
-    if (!inputToken || inputAmount === null || !outputToken || outputAmount === null || inputToken.address === outputToken.address) return null;
+    const inputCount = Number(amount0In > 0n) + Number(amount1In > 0n);
+    const outputCount = Number(amount0Out > 0n) + Number(amount1Out > 0n);
+    if (inputCount !== 1 || outputCount !== 1) return null;
+    const inputToken = amount0In > 0n ? this.token0 : this.token1;
+    const inputAmount = amount0In > 0n ? amount0In : amount1In;
+    const outputToken = amount0Out > 0n ? this.token0 : this.token1;
+    const outputAmount = amount0Out > 0n ? amount0Out : amount1Out;
+    if (inputToken.address === outputToken.address) return null;
     return {
       protocol: this.protocol,
       poolAddress: this.poolAddress,
@@ -183,6 +190,19 @@ export async function priceDecodedSwaps(
     ]);
     if (inputPrice === undefined || outputPrice === undefined) {
       warnings.push(`Missing historical USD price for swap ${swap.transactionHash}; swap excluded from PnL`);
+      continue;
+    }
+    if (
+      !Number.isFinite(inputPrice) ||
+      inputPrice < 0 ||
+      !Number.isFinite(outputPrice) ||
+      outputPrice < 0
+    ) {
+      warnings.push(`Invalid historical USD price for swap ${swap.transactionHash}; swap excluded from PnL`);
+      continue;
+    }
+    if (!validDecimals(swap.assetIn.decimals) || !validDecimals(swap.assetOut.decimals)) {
+      warnings.push(`Invalid token decimals or amount for swap ${swap.transactionHash}; swap excluded from PnL`);
       continue;
     }
     const inputQuantity = baseUnitsToNumber(swap.amountInBaseUnits, swap.assetIn.decimals);
