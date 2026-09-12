@@ -24,6 +24,8 @@ ROBINHOOD_CHAIN_RPC_URL=https://your-indexer-or-rpc.example/robinhood
 
 Robinhood Chain mainnet is available as the `robinhood` chain (chain ID `4663`). `loadRobinhoodChainConfig` reads its RPC URL from `ROBINHOOD_CHAIN_RPC_URL` (or `EVM_PROVIDER_URL_ROBINHOOD`) and never embeds credentials or endpoints. `createJsonRpcProvider` adapts any JSON-RPC transport, and `ingestRpcRange` processes wallet transactions and ERC-20 `Transfer` logs from an incremental block cursor. The RPC layer is intentionally provider-neutral; applications supply the transport and may persist `BlockCursor` between runs.
 
+`discoverActiveWallets` scans a bounded recent block window (default 100 blocks), collects transaction and ERC-20 transfer participants, checks each candidate with `eth_getCode`, deduplicates addresses, and returns a ranked list. Configure `window`, `limit`, `minScore`, and explicit excluded addresses. The conservative score is `transactionCount + 2 * transferCount + activeBlocks`; it is an activity signal only, not a profitability or ownership inference. The scanner requires no credentials beyond whatever public RPC transport the application supplies.
+
 ## PnL baseline
 
 `calculateFifoPnl` calculates realized USD PnL using first-in-first-out lots. Buy fees increase cost basis; sell fees reduce proceeds. Events must already contain normalized quantities and USD prices, which is the responsibility of the upstream adapter. Sells without matching lots are reported as partial and produce warnings rather than inventing acquisition history.

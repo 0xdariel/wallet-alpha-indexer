@@ -31,6 +31,10 @@ export interface RpcDataProvider {
   getLogs(fromBlock: number, toBlock: number, address?: string): Promise<RpcLog[]>;
 }
 
+export interface RpcDiscoveryProvider extends RpcDataProvider {
+  isContractAddress(address: string): Promise<boolean>;
+}
+
 export interface BlockCursor {
   nextBlock: number;
 }
@@ -44,7 +48,7 @@ export interface RpcIngestionResult {
 export const ERC20_TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-export function createJsonRpcProvider(transport: JsonRpcTransport): RpcDataProvider {
+export function createJsonRpcProvider(transport: JsonRpcTransport): RpcDiscoveryProvider {
   return {
     getBlockNumber: async () => hexToNumber(await transport.request<string>("eth_blockNumber", [])),
     getBlock: (blockNumber) =>
@@ -56,6 +60,8 @@ export function createJsonRpcProvider(transport: JsonRpcTransport): RpcDataProvi
         topics: [ERC20_TRANSFER_TOPIC],
         ...(address ? { address } : {}),
       }]),
+    isContractAddress: async (address) =>
+      (await transport.request<string>("eth_getCode", [address, "latest"])) !== "0x",
   };
 }
 
