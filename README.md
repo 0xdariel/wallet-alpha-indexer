@@ -62,3 +62,14 @@ The swap layer is provider-neutral and deliberately conservative. The only built
 `HistoricalPriceProvider` supplies timestamped USD prices for both swap assets. `priceDecodedSwaps` emits token `TradeEvent`s only when both prices and validated token decimals are available, and returns an explicit warning otherwise. Prices, pool metadata, router attribution, and protocol coverage are application-supplied; no endpoint, API key, ownership, or Robinhood-account claim is included.
 
 Robinhood ingestion supports public wallet analysis only. It does not establish ownership or attribute an address to a Robinhood account. Incomplete RPC/indexer data, reorgs, missing token metadata, and unsupported activity can materially affect PnL.
+
+## End-to-end Robinhood Chain PnL report
+
+`buildWalletPnlReport` provides a bounded, provider-neutral report for a public wallet on Robinhood Chain. Supply a wallet, `fromBlock`/`toBlock` range (at most 10,000 blocks), an RPC provider, explicitly configured supported swap adapters, a `TokenMetadataCache`, and an injectable `HistoricalPriceProvider`. The pipeline:
+
+1. Reads block timestamps and supported swap logs.
+2. Resolves token decimals and symbols through the metadata cache.
+3. Requests historical USD prices without fabricating missing values.
+4. Converts priced swaps into FIFO events and returns deterministic JSON through `serializeWalletPnlReport`.
+
+The report includes realized PnL, FIFO holdings, trade count, and a win rate only when at least one swap has both prices. It reports confidence and sorted warnings for missing prices, metadata, unmatched history, unsupported activity, and partial RPC data. Generic ERC-20 transfers are never treated as trades. Unrealized PnL is intentionally not calculated: holdings are open FIFO positions and are not valued at a current or historical mark. The result is an analysis of public on-chain activity only and does not prove wallet ownership or Robinhood account attribution.
