@@ -150,6 +150,7 @@ export interface HistoricalPriceRequest {
   assetAddress: string;
   chain: string;
   timestamp: number;
+  blockNumber?: number;
   transactionHash: string;
 }
 
@@ -174,20 +175,27 @@ export async function priceDecodedSwaps(
   const events: TradeEvent[] = [];
   const warnings: string[] = [];
   for (const swap of swaps) {
-    const [inputPrice, outputPrice] = await Promise.all([
-      provider.getUsdPrice({
-        assetAddress: swap.assetIn.address,
-        chain: swap.chain,
-        timestamp: swap.timestamp,
-        transactionHash: swap.transactionHash,
-      }),
-      provider.getUsdPrice({
-        assetAddress: swap.assetOut.address,
-        chain: swap.chain,
-        timestamp: swap.timestamp,
-        transactionHash: swap.transactionHash,
-      }),
-    ]);
+    const requests = [swap.assetIn.address, swap.assetOut.address].map((assetAddress) => ({
+      assetAddress,
+      chain: swap.chain,
+      timestamp: swap.timestamp,
+      ...(swap.blockNumber === undefined ? {} : { blockNumber: swap.blockNumber }),
+      transactionHash: swap.transactionHash,
+    }));
+    const prices = await Promise.all(requests.map(async (request) => {
+      try {
+        return { value: await provider.getUsdPrice(request) };
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : "price provider failed" };
+      }
+    }));
+    const inputPrice = prices[0]?.value;
+    const outputPrice = prices[1]?.value;
+    const providerError = prices.find((price) => "error" in price)?.error;
+    if (providerError) {
+      warnings.push(`Historical USD price lookup failed for swap ${swap.transactionHash}: ${providerError}; swap excluded from PnL`);
+      continue;
+    }
     if (inputPrice === undefined || outputPrice === undefined) {
       warnings.push(`Missing historical USD price for swap ${swap.transactionHash}; swap excluded from PnL`);
       continue;

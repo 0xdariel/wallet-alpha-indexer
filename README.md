@@ -59,9 +59,19 @@ This is an explicitly incomplete baseline. It does not yet value open positions,
 
 The swap layer is provider-neutral and deliberately conservative. The only built-in adapter is `UniswapV2SwapAdapter`, which accepts only the canonical `Swap(address,uint256,uint256,uint256,uint256,address)` event (`0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822`) for a configured pool and token pair. ERC-20 `Transfer` logs, unknown signatures, and swaps where the wallet is not an indexed sender or recipient are ignored; no other protocol is claimed to be supported.
 
-`HistoricalPriceProvider` supplies timestamped USD prices for both swap assets. `priceDecodedSwaps` emits token `TradeEvent`s only when both prices and validated token decimals are available, and returns an explicit warning otherwise. Prices, pool metadata, router attribution, and protocol coverage are application-supplied; no endpoint, API key, ownership, or Robinhood-account claim is included.
+`HistoricalPriceProvider` supplies timestamped USD prices for both swap assets. `priceDecodedSwaps` emits token `TradeEvent`s only when both prices and validated token decimals are available, and returns an explicit warning otherwise. `HttpHistoricalPriceProvider` is a provider-neutral adapter for a configured JSON endpoint template. The template must contain `{chain}`, `{assetAddress}`, and `{timestamp}` (and may contain `{blockNumber}`); the response must contain `priceUsd` or `price`, optionally with a quote `timestamp` and `blockNumber`. Quotes older than the configured tolerance or newer than the requested block are rejected. HTTP failures, timeouts, invalid prices, and stale quotes are surfaced as warnings; URLs and endpoint contents are never logged. There is no hardcoded market-data endpoint because endpoint history, chain identifiers, and authentication contracts vary; callers must configure and test their own endpoint.
 
 Robinhood ingestion supports public wallet analysis only. It does not establish ownership or attribute an address to a Robinhood account. Incomplete RPC/indexer data, reorgs, missing token metadata, and unsupported activity can materially affect PnL.
+
+For bounded live validation without persisting secrets or state, configure an RPC URL (environment or flag), a price endpoint template, and one token address:
+
+```bash
+ROBINHOOD_CHAIN_RPC_URL=https://your-rpc.example npm run validate:robinhood -- \
+  --price-url-template "https://your-prices.example/history?chain={chain}&asset={assetAddress}&timestamp={timestamp}&block={blockNumber}" \
+  --asset 0x0000000000000000000000000000000000000001 --timeout-ms 5000
+```
+
+The command reads the latest RPC block and requests one historical quote at that block timestamp. It is bounded to one RPC block and one price request, prints only chain/range/result data, and never persists or prints either endpoint. It requires the configured price provider to support the documented template/response contract; a provider-specific API key should be supplied through that provider's normal environment or authenticated fetch integration, not committed to this repository. No live validation is run in CI without configured public endpoints.
 
 ## End-to-end Robinhood Chain PnL report
 
